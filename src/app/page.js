@@ -1,95 +1,109 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client";
+import { useState, useEffect } from 'react';
+import * as tf from '@tensorflow/tfjs';
+import '@tensorflow/tfjs-backend-cpu';
+import '@tensorflow/tfjs-backend-webgl';
+import styles from './page.module.css';
+import Link from 'next/link';
+function Page() {
+  const [centroides, setCentroides] = useState(null);
+  const [mean, setMean] = useState(null);
+  const [scale, setScale] = useState(null);
+  const [inputs, setInputs] = useState({ release_year: '', duration: '' });
+  const [predictedCluster, setPredictedCluster] = useState(null);
 
-export default function Home() {
+  useEffect(() => {
+    async function loadModel() {
+      const modelUrl = `${window.location.origin}/model/model.json`;
+      try {
+        const response = await fetch(modelUrl);
+        const data = await response.json();
+        console.log('Modelo cargado:', data);
+        // Calcular mean y scale a partir de los datos
+        setMean([2000, 100]);
+        setScale([10, 20]);
+        setCentroides(data);
+        
+      } catch (error) {
+        console.error('Error cargando el modelo:', error);
+      }
+    }
+    loadModel();
+  }, []);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setInputs(prevState => ({ ...prevState, [name]: value }));
+  };
+
+  const handlePredict = async () => {
+    if (!mean || !scale || !centroides) {
+      console.log('Modelo centroides:', centroides);
+        console.log('Modelo mean:', mean);
+        console.log('Modelo scale:', scale);
+      console.error('Los parámetros del modelo no están cargados aún');
+      return;
+    }
+
+    const new_data = [parseFloat(inputs.release_year), parseFloat(inputs.duration)];
+    if (isNaN(new_data[0]) || isNaN(new_data[1])) {
+      console.error('Datos de entrada no válidos:', new_data);
+      return;
+    }
+
+    // Normalizar los nuevos datos utilizando los parámetros de escalado
+    const meanTensor = tf.tensor1d(mean);
+    const scaleTensor = tf.tensor1d(scale);
+    const new_dataTensor = tf.tensor2d([new_data]);
+    const X_new_scaled = new_dataTensor.sub(meanTensor).div(scaleTensor);
+
+    // Calcular las distancias a los centroides
+    const centroidesTensor = tf.tensor2d(centroides);
+    const distances = tf.norm(X_new_scaled.sub(centroidesTensor), 'euclidean', 1);
+
+    // Obtener el clúster más cercano
+    const predictedClusterIndex = distances.argMin().dataSync()[0];
+    setPredictedCluster(predictedClusterIndex);
+  };
+
   return (
-    <main className={styles.main}>
-      <div className={styles.description}>
-        <p>
-          Get started by editing&nbsp;
-          <code className={styles.code}>src/app/page.js</code>
-        </p>
-        <div>
-          <a
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className={styles.vercelLogo}
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
-
-      <div className={styles.center}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className={styles.grid}>
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Docs <span>-&gt;</span>
-          </h2>
-          <p>Find in-depth information about Next.js features and API.</p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Learn <span>-&gt;</span>
-          </h2>
-          <p>Learn about Next.js in an interactive course with&nbsp;quizzes!</p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Templates <span>-&gt;</span>
-          </h2>
-          <p>Explore starter templates for Next.js.</p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Deploy <span>-&gt;</span>
-          </h2>
-          <p>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+    <div>
+    <div className={styles.card}>
+      
+      <h1>Netflix Cluster</h1>
+      <form>
+        <label>
+          Año de lanzamiento / Release year:
+          <br/>
+          <br/>
+          <input type="number" name="release_year" value={inputs.release_year} onChange={handleChange} />
+        </label>
+        <label>
+          Duración / duration (minutos/minutes):
+          <br/>
+          <br/>
+          <input type="number" name="duration" value={inputs.duration} onChange={handleChange} />
+        </label>
+      </form>
+      <button type="button" onClick={handlePredict}>Predecir</button>
+      {predictedCluster !== null && (
+        <h2>The new data belongs to the cluster {predictedCluster}</h2>
+      )}
+      
+    </div>
+    
+    
+    <div className="project-github">
+      <p>This project is in </p>
+      <Link href="https://github.com/diegoperea20">
+        <img width="96" height="96" src="https://img.icons8.com/fluency/96/github.png" alt="github"/>
+      </Link>
+      <br/>
+          <br/>
+      <img className={styles.clusterImage}  src="/assets/cluster.png"  alt="cluster"/>
+    </div>
+    </div>
   );
 }
+
+export default Page;
