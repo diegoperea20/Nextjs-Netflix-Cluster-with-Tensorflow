@@ -85,7 +85,7 @@ function Page() {
           <input type="number" name="duration" value={inputs.duration} onChange={handleChange} />
         </label>
       </form>
-      <button type="button" onClick={handlePredict}>Predecir</button>
+      <button type="button" onClick={handlePredict}>Predecir / Predict</button>
       {predictedCluster !== null && (
         <h2>The new data belongs to the cluster {predictedCluster}</h2>
       )}
